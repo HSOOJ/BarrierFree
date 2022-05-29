@@ -10,6 +10,7 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import javax.transaction.Transactional;
 
@@ -144,7 +145,7 @@ public class UserServiceImpl implements UserService {
 	@Override
 	public void sendEmailwithUserKey(String email, String id) {
 		User user = userRepository.findByUserId(id);
-		String link = "http://localhost:3000/user/email/certified?userNickname=" + user.getUserNickname()
+		String link = "https://i6a504.p.ssafy.io/user/email/certified?userNickname=" + user.getUserNickname()
 				+ "&certified=" + user.getCertKey();
 		String message = mailContentBuilder.build(link);
 		try {
@@ -227,7 +228,7 @@ public class UserServiceImpl implements UserService {
 			StringBuilder sb = new StringBuilder();
 			sb.append("grant_type=authorization_code");
 			sb.append("&client_id=fa3c898eec92948b420f6f03b934acd1"); // REST_API_KEY 입력
-			sb.append("&redirect_uri=http://localhost:8080/user/login/kakao"); // 인가코드 받은 redirect_uri 입력
+			sb.append("&redirect_uri=https://i6a504.p.ssafy.io/kakaologinpage"); // 인가코드 받은 redirect_uri 입력
 			sb.append("&code=" + code);
 			bw.write(sb.toString());
 			bw.flush();
@@ -406,6 +407,7 @@ public class UserServiceImpl implements UserService {
 			userinfo.put("userSeq", user.getUserSeq());
 			userinfo.put("userPhoto", user.getUserPhoto());
 			userinfo.put("userEmail", user.getUserEmail());
+			userinfo.put("impairment", userImpairmentRepository.findImpairment(user.getUserSeq()));
 		}
 		return userinfo;
 	}
@@ -414,9 +416,9 @@ public class UserServiceImpl implements UserService {
 	public boolean modifyUser(User user) throws Exception{
 		try {
 			User newUser = userRepository.findByUserSeq(user.getUserSeq());
-			newUser.setUserNickname(user.getUserNickname());
-			newUser.setUserPwd(passwordEncoder.encode(user.getUserPwd()));
-			newUser.setUserPhoto(user.getUserPhoto());
+			if(user.getUserNickname()!=null) newUser.setUserNickname(user.getUserNickname());
+			if(user.getUserPwd()!=null)  newUser.setUserPwd(passwordEncoder.encode(user.getUserPwd()));
+			if(user.getUserPhoto()!=null) newUser.setUserPhoto(user.getUserPhoto());
 			newUser.setModDt(TimeUtils.curTime());
 			newUser.setModId(userRepository.findByUserSeq(user.getUserSeq()).getUserId());
 			
@@ -449,5 +451,160 @@ public class UserServiceImpl implements UserService {
 		String userId = jwtUtil.extractUserId(accessToken);
 		int userSeq = userRepository.findByUserId(userId).getUserSeq();
 		tokenRepository.deleteByUserSeq(userSeq); // 해당 리프레시 토큰 삭제
+	}
+
+	@Override
+	public int updateUserImpairmentByUserSeq(int userSeq, Impairment impairment) throws Exception {
+		// 입력한 게시글 번호의 모든 장애 정보 반환(del_yn = n)
+		List<UserImpairment> curImpairment = userImpairmentRepository.findByDelYnAndUserSeq('n', userSeq);
+		int res = 0;
+		// 입력된 장애 정보 저장하는 배열
+		// -1) 선택 X, 1) 선택
+		// physical, visibility, deaf, infant, senior
+		int check[] = new int[] { -1, -1, -1, -1, -1 };
+
+		for (int i = 0; i < curImpairment.size(); i++) { // 원래 게시글의 장애 정보 수 만큼 반복
+			String im = curImpairment.get(i).getCode(); // 게시글의 장애 코드 ex) physical
+
+			// 선택된 상태면 check를 1로
+			switch (im) {
+			case "physical":
+				check[0] = 1;
+				break;
+			case "visibility":
+				check[1] = 1;
+				break;
+			case "deaf":
+				check[2] = 1;
+				break;
+			case "infant":
+				check[3] = 1;
+				break;
+			case "senior":
+				check[4] = 1;
+				break;
+			}
+		}
+
+		// check : 원래 선택 여부(-1) -> impairment : 새로 선택 여부(1)
+		// 취소 -> 선택 : post_code table에 추가하기
+		if (check[0] == -1 && impairment.getPhysical() == 1) {
+			saveImpairment(0, userSeq);
+			res = 1;
+		}
+		if (check[1] == -1 && impairment.getVisibility() == 1) {
+			saveImpairment(1, userSeq);
+			res = 1;
+		}
+		if (check[2] == -1 && impairment.getDeaf() == 1) {
+			saveImpairment(2, userSeq);
+			res = 1;
+		}
+		if (check[3] == -1 && impairment.getInfant() == 1) {
+			saveImpairment(3, userSeq);
+			res = 1;
+		}
+		if (check[4] == -1 && impairment.getSenior() == 1) {
+			saveImpairment(4, userSeq);
+			res = 1;
+		}
+
+		// check : 원래 선택 여부(1) -> impairment : 새로 선택 여부(0)
+		// 선택 -> 취소 : post_code에서 삭제하기 del_yn = y
+		if (check[0] == 1 && impairment.getPhysical() == 0) {
+			updateImpairment(0, userSeq);
+			res = 1;
+		}
+		if (check[1] == 1 && impairment.getVisibility() == 0) {
+			updateImpairment(1, userSeq);
+			res = 1;
+		}
+		if (check[2] == 1 && impairment.getDeaf() == 0) {
+			updateImpairment(2, userSeq);
+			res = 1;
+		}
+		if (check[3] == 1 && impairment.getInfant() == 0) {
+			updateImpairment(3, userSeq);
+			res = 1;
+		}
+		if (check[4] == 1 && impairment.getSenior() == 0) {
+			updateImpairment(4, userSeq);
+			res = 1;
+		}
+
+		return res;
+	}
+	
+	// 사용자 장애정보 저장하기
+		public void saveImpairment(int im, int userSeq) {
+			String curTime = TimeUtils.curTime();
+			String type = "";
+			switch (im) {
+			case 0:
+				type = "physical";
+				break;
+			case 1:
+				type = "visibility";
+				break;
+			case 2:
+				type = "deaf";
+				break;
+			case 3:
+				type = "infant";
+				break;
+			case 4:
+				type = "senior";
+				break;
+			}
+
+			userImpairmentRepository.save(UserImpairment.builder()
+					.userSeq(userSeq)
+					.code(type)
+					.delYn('n')
+					.regDt(curTime)
+					.regId(returnUserId(userSeq))
+					.modDt(curTime)
+					.modId(returnUserId(userSeq)).build());
+	}
+		
+	// userSeq -> userId
+	public String returnUserId(int userSeq) {
+		Optional<User> list = userRepository.findById(userSeq);
+		String userId = list.get().getUserId();
+		return userId;
+	}
+	
+	public void updateImpairment(int im, int userSeq) {
+		String curTime = TimeUtils.curTime();
+		String type = "";
+		switch (im) {
+		case 0:
+			type = "physical";
+			break;
+		case 1:
+			type = "visibility";
+			break;
+		case 2:
+			type = "deaf";
+			break;
+		case 3:
+			type = "infant";
+			break;
+		case 4:
+			type = "senior";
+			break;
+		}
+
+		Optional<UserImpairment> ui = userImpairmentRepository.findOneByUserSeqCode(userSeq, type);
+		ui.get().setDelYn('y');
+		ui.get().setModDt(curTime);
+		ui.get().setModId(returnUserId(userSeq));
+		save(ui.get());
+	}
+	
+	// 사용자 장애정보 저장하기
+	public UserImpairment save(UserImpairment userImpairment) {
+		userImpairmentRepository.save(userImpairment);
+		return userImpairment;
 	}
 }

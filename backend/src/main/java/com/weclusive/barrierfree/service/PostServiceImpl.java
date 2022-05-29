@@ -73,7 +73,7 @@ public class PostServiceImpl implements PostService {
 	public Optional<Post> deleteByPostSeq(long postSeq, int userSeq) {
 		Optional<Post> deletePost = postRepository.findByPostSeq(postSeq);
 
-		if (deletePost != null) {
+		if (deletePost.isPresent()) {
 			String curTime = TimeUtils.curTime();
 
 			deletePost.get().setDelYn('y');
@@ -262,7 +262,6 @@ public class PostServiceImpl implements PostService {
 		}
 
 		Optional<PostImpairment> pi = postImpairmentRepository.findOneByPostSeqCode(postSeq, type);
-		pi.get().setDelYn('y');
 		pi.get().setModDt(curTime);
 		pi.get().setModId(returnUserId(userSeq));
 		save(pi.get());

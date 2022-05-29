@@ -1,6 +1,7 @@
 package com.weclusive.barrierfree.controller;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.mail.MessagingException;
@@ -9,7 +10,6 @@ import javax.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.weclusive.barrierfree.dto.Impairment;
 import com.weclusive.barrierfree.dto.UserFind;
 import com.weclusive.barrierfree.dto.UserJoin;
 import com.weclusive.barrierfree.dto.UserJoinKakao;
@@ -33,7 +34,6 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 
 @RestController
-@CrossOrigin("*")
 @RequestMapping("/user")
 @Api("사용자 컨트롤러 API")
 public class UserController {
@@ -51,6 +51,10 @@ public class UserController {
 	@ApiOperation(value = "회원가입", notes = "사용자가 입력한 회원정보를 등록한다.")
 	public ResponseEntity<String> join(@RequestBody UserJoin userJoin) {
 		try {
+			// 이미 가입된 이메일이면
+			if(userService.findByUserEmail(userJoin.getUserEmail()) != null){
+				return new ResponseEntity(FAIL, HttpStatus.OK);
+			}
 			userService.registUser(userJoin); // 회원등록 - 회원정보, 장애정보
 			userService.sendEmailwithUserKey(userJoin.getUserEmail(), userJoin.getUserId()); // 이메일 인증
 		} catch (Exception e) {
@@ -90,7 +94,7 @@ public class UserController {
 			if (kakaoUser == null) { // 최초 로그인이면
 				resultMap.put("message", "최초 로그인");
 				resultMap.put("accessToken", kakaoToken);
-				HttpStatus status = HttpStatus.NO_CONTENT;
+				HttpStatus status = HttpStatus.ACCEPTED;
 				return new ResponseEntity<Map<String, Object>>(resultMap, status);
 			}
 		} catch (Exception e) {
@@ -101,7 +105,7 @@ public class UserController {
 		User user = userService.findByUserId(kakaoUser.getUserId());
 		resultMap.put("accessToken", userService.createAccessToken(user));
 		resultMap.put("message", SUCCESS);
-		HttpStatus status = HttpStatus.ACCEPTED;
+		HttpStatus status = HttpStatus.OK;
 
 		return new ResponseEntity<Map<String, Object>>(resultMap, status);
 	}
@@ -134,6 +138,10 @@ public class UserController {
 				return new ResponseEntity<Map<String, Object>>(resultMap, status);
 			} else {
 				User user = userService.findByUserId(loginUser.getUserId());
+				if(user.getEnabledYn() == 'n') {
+					resultMap.put("message", "이메일 인증이 안 된 사용자입니다.");
+					return new ResponseEntity<Map<String, Object>>(resultMap, HttpStatus.FORBIDDEN);
+				}
 				resultMap.put("accessToken", userService.createAccessToken(user));
 				resultMap.put("message", SUCCESS);
 				status = HttpStatus.ACCEPTED;
@@ -163,11 +171,11 @@ public class UserController {
 		if (user == null) {
 			return new ResponseEntity<String>(SUCCESS, HttpStatus.OK);
 		} else
-			return new ResponseEntity<String>("아이디 중복", HttpStatus.BAD_REQUEST);
+			return new ResponseEntity<String>(FAIL, HttpStatus.OK);
 	}
 
 	// 사용자 닉네임 중복확인
-	@PostMapping("/check/nickname")
+	@GetMapping("/check/nickname")
 	@ApiOperation(value = "닉네임 중복 확인", notes = "닉네임 중복 여부를 반환한다.")
 	public ResponseEntity<String> checkNickname(@RequestParam String userNickname) {
 		User user = userService.findByUserNickname(userNickname);
@@ -175,7 +183,7 @@ public class UserController {
 		if (user == null) {
 			return new ResponseEntity<String>(SUCCESS, HttpStatus.OK);
 		} else
-			return new ResponseEntity<String>("닉네임 중복", HttpStatus.BAD_REQUEST);
+			return new ResponseEntity<String>(FAIL, HttpStatus.OK);
 	}
 
 	@GetMapping("/find/id")
@@ -184,7 +192,7 @@ public class UserController {
 		User user = userService.findByUserEmail(userEmail);
 
 		if (user == null) {
-			return new ResponseEntity<String>("이메일을 다시 확인해주세요", HttpStatus.BAD_REQUEST);
+			return new ResponseEntity<String>(FAIL, HttpStatus.OK);
 		} else {
 
 			return new ResponseEntity<String>(StringUtils.idString(user.getUserId()), HttpStatus.OK);
@@ -201,7 +209,7 @@ public class UserController {
 			userService.sendEmailwithTemp(userFind.getUserEmail(), userFind.getUserId());
 			return new ResponseEntity<String>(SUCCESS, HttpStatus.OK);
 		} else {
-			return new ResponseEntity<String>("이메일 혹은 아이디를 다시 확인해주세요", HttpStatus.BAD_REQUEST);
+			return new ResponseEntity<String>("이메일 혹은 아이디를 다시 확인해주세요", HttpStatus.OK);
 		}
 	}
 
@@ -218,7 +226,7 @@ public class UserController {
 
 			return new ResponseEntity<Map<String, Object>>(userinfo, status);
 		} catch (Exception e) {
-			System.out.println(e.getMessage());
+			// System.out.println(e.getMessage());
 			status = HttpStatus.BAD_REQUEST;
 			userinfo.put("message", FAIL);
 			return new ResponseEntity<Map<String, Object>>(userinfo, status);
@@ -252,6 +260,23 @@ public class UserController {
 			e.printStackTrace();
 			result.put("result", FAIL);
 			return new ResponseEntity<Map<String, Object>>(result, HttpStatus.BAD_REQUEST);
+		}
+	}
+	
+	@PutMapping(value = "/updateImpairment")
+	@ApiOperation(value = "사용자 장애 정보 수정하기", response = List.class)
+	public ResponseEntity<String> updatePostImpairment(@RequestParam int userSeq, @RequestBody Impairment impairment) {
+		int res;
+		try {
+			res = userService.updateUserImpairmentByUserSeq(userSeq, impairment);
+			if (res == 1)
+				return new ResponseEntity<String>(SUCCESS + " : 수정", HttpStatus.OK);
+			else
+				return new ResponseEntity<String>(SUCCESS + " : 수정 사항 없음", HttpStatus.OK);
+				
+		} catch (Exception e) {
+			e.printStackTrace();
+			return new ResponseEntity<String>(FAIL, HttpStatus.BAD_REQUEST);
 		}
 	}
 }

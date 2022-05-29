@@ -1,12 +1,13 @@
-import UserScrapsIn from '../Reviews/UserScrapsIn';
-import UserScrapsOut from '../Reviews/UserScrapsOut';
+import UserScrapsIn from './UserScrapsIn';
+import UserScrapsOut from './UserScrapsOut';
 
-const UserScraps = () => {
+const UserScraps = ({ getUserHeader }) => {
   return (
     <div>
-      <div>UserScraps</div>
-      <UserScrapsIn></UserScrapsIn>
-      <UserScrapsOut></UserScrapsOut>
+      <UserScrapsIn getUserHeader={getUserHeader}></UserScrapsIn>
+      <br></br>
+      <br></br>
+      <UserScrapsOut getUserHeader={getUserHeader}></UserScrapsOut>
     </div>
   );
 };

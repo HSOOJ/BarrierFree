@@ -1,157 +1,276 @@
-import { useRef, useEffect, useState } from 'react';
-import Quill from 'quill';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import 'quill/dist/quill.bubble.css';
 import styled from 'styled-components';
-import palette from '../../lib/styles/palette';
-import Responsive from '../common/Responsive';
+import FavoriteIcon from '@mui/icons-material/Star';
+import FavoriteBorderIcon from '@mui/icons-material/StarBorder';
 import axios from '../../../node_modules/axios/index';
-import PlaceBox from './PlaceBox';
-import WriteButtons from './WriteButtons';
-import PlaceBoxContainer from '../../containers/auth/write/PlaceBoxContainer';
-import { useSelector } from 'react-redux';
+import PlaceBoxContainer from '../../containers/write/PlaceBoxContainer';
+import { useDispatch } from 'react-redux';
+import WriteButtonsContainer from '../../containers/write/WriteButtonsContainer';
+import Button from '../common/Button';
+import * as React from 'react';
+import Rating from '@mui/material/Rating';
+import { changeField } from '../../_actions/write_actions';
+import { Card, CardActionArea, CardMedia } from '@mui/material';
+import { writePost, initialize } from '../../_actions/write_actions';
+import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
+import WriteBarrierIconContainer from '../../containers/write/WriteBarrierIconContainer';
+import TextField from '@mui/material/TextField';
+import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
+import UploadImage from '../images/uploadImage.png';
 
-const EditorBlock = styled(Responsive)`
-  padding-top: 5rem;
-  padding-bottom: 5rem;
-`;
+const StyledRating = styled(Rating)({
+  '& .MuiRating-iconFilled': {
+    color: '#ff6d75',
+  },
+  '& .MuiRating-iconHover': {
+    color: '#EA5455',
+  },
+});
 
-const TitleInput = styled.input`
-  font-size: 2.5rem;
-  outline: none;
-  padding-bottom: 0.5rem;
-  border: none;
-  border-bottom: 1px solid ${palette.gray[0]};
-  margin-bottom: 2rem;
-  width: 100%;
-`;
-
-const BodyTextarea = styled.textarea`
-  font-size: 1.125rem;
-  outline: none;
-  padding-bottom: 0.5rem;
-  border: none;
-  border-bottom: 1px solid ${palette.gray[0]};
-  margin-bottom: 2rem;
-  width: 100%;
-  min-height: 300px;
-  line-height: 2;
-  text-align: left;
-  padding-top: 0px;
-  vertical-align: top;
-  text-align: start;
-`;
-
-const QuillWrapper = styled.div`
-  .ql-editor {
-    padding: 0;
-    min-height: 300px;
-    font-size: 1.125rem;
-    line-height: 2;
-  }
-`;
-
-const Editor = ({ onChangeField, title, body, loadingWritePost }) => {
-  const quillElement = useRef(null);
-  const quillInstance = useRef(null);
-  const [files, setFiles] = useState('');
-
-  const onLoadFile = (event) => {
-    const file = event.target.files;
-    setFiles(file);
-    console.log(files);
-  };
-
-  const handleClick = (event) => {
-    const formdata = new FormData();
-    formdata.append('postPhoto', files[0]);
-    console.log(formdata);
-    console.log(files[0]);
-
-    const config = {
-      Headers: {
-        'content-type': 'multipart/form-data',
-      },
-    };
-    axios({
-      method: 'post',
-      url: '/post/savePost',
-      formdata: formdata,
-      config: config,
-    });
-  };
-  useEffect(() => {
-    quillInstance.current = new Quill(quillElement.current, {
-      placeholder: '내용 작성란',
-      modules: {
-        toolbar: [
-          [{ header: '1' }, { header: '2' }],
-          ['bold', 'italic', 'underline', 'strike'],
-          [{ list: 'ordered' }, { list: 'bullet' }],
-          ['clean'],
-        ],
-      },
-      theme: 'bubble',
-    });
-  }, []);
-
+const Editor = ({
+  postTitle,
+  postContent,
+  postLocation,
+  postPoint,
+  userSeq,
+  contentId,
+  deaf,
+  infant,
+  physical,
+  visibility,
+  senior,
+  postAddress,
+  postLat,
+  postLng,
+  postPhoto,
+  onChangeField,
+  postAlt,
+}) => {
+  const navigate = useNavigate();
   const onChangeTitle = (e) => {
-    onChangeField({ key: 'title', value: e.target.value });
+    onChangeField({ key: 'postTitle', value: e.target.value });
   };
 
   const onChangeBody = (e) => {
-    console.log('changebody', e);
-    onChangeField({ key: 'body', value: e.target.value });
+    onChangeField({ key: 'postContent', value: e.target.value });
   };
 
-  useEffect(() => {
-    preview();
-    return () => preview();
-  }, []);
-  const preview = () => {
-    if (!files) return false;
-    const imgEl = document.querySelector('.img__box');
-    const reader = new FileReader();
-
-    reader.onLoad = () =>
-      (imgEl.style.backgroundImage = `url(${reader.result})`);
-    reader.readAsDataURL(files[0]);
+  const onChangePostPoint = (e) => {
+    onChangeField({ key: 'postPoint', value: e.target.value });
   };
+
+  const dispatch = useDispatch();
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageData, setImageData] = useState(null);
+  const [imageName, setImageName] = useState(postAlt);
+
+  const [loading, setLoading] = useState(false);
+  const onUpload = (event) => {
+    event.preventDefault();
+
+    if (event.target.files[0]) {
+      setLoading('loading');
+    }
+
+    const file = event.target.files[0];
+    // const imageData = new FormData();
+    // imageData.append('photo', file);
+    setImageData(file);
+    setLoading(true);
+    // setImageData(imageData);
+    // setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const uploadImageWithAdtData = async () => {
+    // 전송 보내기 전에 새로운 이름 붙이기
+    // 이 부분은 imageData에 붙이지 말고 state값에 alt로 넘겨주기
+    // imageData.append('postAlt', imageName);
+    // dispatch(uploadImage(imageData));
+    if (imageData) {
+      const imageFile = new FormData();
+      imageFile.append('photo', imageData);
+      try {
+        const response = await axios({
+          method: 'post',
+          url: '/upload/photo',
+          data: imageFile,
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        // alert('사진 등록이 완료되었습니다!😋');
+        await dispatch(changeField({ key: 'postPhoto', value: response.data }));
+        await dispatch(changeField({ key: 'postAlt', value: imageName }));
+        // await dispatch(changeField({ key: 'postAlt', value: response.data }));
+        setImageData(null);
+        setImagePreview(null);
+        dispatch(
+          writePost({
+            postTitle,
+            postContent,
+            postLocation,
+            postPoint,
+            userSeq,
+            contentId,
+            deaf,
+            infant,
+            physical,
+            visibility,
+            senior,
+            postAddress,
+            postLat,
+            postLng,
+            postPhoto: response.data,
+            postAlt: imageName,
+          }),
+        );
+        alert('글이 등록되었습니다! 베리어프리에 한발짝 다가가셨습니다 😊');
+        dispatch(initialize());
+        navigate('/');
+      } catch (error) {
+        // console.log(error);
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      alert('사진을 추가하세요😀');
+    }
+  };
+
+  const onChange = (event) => {
+    setImageName(event.target.value);
+  };
+
+  const onDelete = () => {
+    setImagePreview(null);
+    setImageData(null);
+  };
+
+  let inputRef;
 
   return (
-    <EditorBlock>
-      <hr></hr>
-      <TitleInput placeholder="제목입력" onChange={onChangeTitle}></TitleInput>
-      <BodyTextarea
-        placeholder="input내용 작성"
-        onChange={onChangeBody}
-      ></BodyTextarea>
-      <PlaceBoxContainer></PlaceBoxContainer>
-      {loadingWritePost && '등록 중입니다!'}
-      {!loadingWritePost && <WriteButtons></WriteButtons>}
-      <QuillWrapper>
-        <div ref={quillElement} />
-      </QuillWrapper>
-      <div>
-        {/* <form method="post" enctype="multipart/form-data"> */}
-        <label for="imageFile">사진 선택</label>
-        <input
-          id="file"
-          name="file"
-          type="file"
-          accept="image/*"
-          onChange={onLoadFile}
-        />
+    <div>
+      <Box>
+        <Grid container spacing={4}>
+          <Grid item xs={1}></Grid>
+          <Grid item xs={5}>
+            <div className="lefteditor">
+              <Card sx={{ maxHeiht: 600 }}>
+                <CardActionArea>
+                  <label htmlFor="upload-profile-image">
+                    <CardMedia
+                      height="400"
+                      component="img"
+                      image={
+                        postPhoto
+                          ? postPhoto
+                          : imagePreview != null
+                          ? imagePreview
+                          : UploadImage
+                      }
+                      // image={imagePreview != null ? imagePreview : UploadImage}
+                    />
+                  </label>
+                </CardActionArea>
+              </Card>
+              <br />
+              <input
+                type="file"
+                id="upload-profile-image"
+                // capture="user"
+                accept="image/*"
+                onChange={onUpload}
+                ref={(refParam) => (inputRef = refParam)}
+                style={{ display: 'none' }}
+              />
+              <label htmlFor="upload-profile-image">
+                <Button
+                  variant="contained"
+                  component="span"
+                  onClick={() => inputRef.click()}
+                >
+                  파일 찾기
+                </Button>
+              </label>
+              &nbsp;
+              <Button onClick={onDelete}>올리기 취소</Button>
+              {/* <Button component="span" onClick={uploadImageWithAdtData}>
+          이미지 등록
+        </Button> */}
+              <br /> <br />
+              <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
+                <RecordVoiceOverIcon
+                  sx={{ color: 'action.active', mr: 1, my: 0.5 }}
+                />
+                <TextField
+                  name="name"
+                  onChange={onChange}
+                  value={imageName}
+                  placeholder="음성용 사진 설명을 적어주세요"
+                  id="input-with-sm"
+                  variant="standard"
+                  sx={{ width: '100%' }}
+                />
+              </Box>
+              {/* <TextField
+              // label="Image Name"
+              /> */}
+            </div>
+          </Grid>
+          <Grid item xs={5}>
+            <div className="righteditor">
+              <div>
+                <TextField
+                  // width="60"
+                  inputProps={{ style: { fontSize: 30, fontWeight: 'bold' } }}
+                  placeholder="제목"
+                  onChange={onChangeTitle}
+                  value={postTitle}
+                  variant="standard"
+                ></TextField>
+                <br></br>
+                <br></br>
+                <StyledRating
+                  value={postPoint}
+                  name="postPoint"
+                  defaultValue={0}
+                  getLabelText={(value) =>
+                    `${value} Heart${value !== 1 ? 's' : ''}`
+                  }
+                  icon={<FavoriteIcon fontSize="inherit" />}
+                  emptyIcon={<FavoriteBorderIcon fontSize="inherit" />}
+                  precision={1}
+                  size="large"
+                  onChange={onChangePostPoint}
+                />
+              </div>
+              <br />
+              <br />
+              <TextField
+                id="standard-multiline-static"
+                multiline
+                rows={8}
+                variant="standard"
+                onChange={onChangeBody}
+                value={postContent}
+                fullWidth
+                placeholder="여행 후기와 장소에 대한 설명을 작성해주세요"
+              />
 
-        <button onClick={handleClick}>save</button>
-        {/* </form> */}
-        <div className="img__box"></div>
-
-        <p>
-          <label for="imageFile">사진 찍기</label>
-          <input type="file" id="imageFile" capture="user" accept="image/*" />
-        </p>
-      </div>
-    </EditorBlock>
+              <WriteBarrierIconContainer></WriteBarrierIconContainer>
+              <br />
+              <PlaceBoxContainer></PlaceBoxContainer>
+              <WriteButtonsContainer
+                uploadImageWithAdtData={uploadImageWithAdtData}
+              ></WriteButtonsContainer>
+            </div>
+          </Grid>
+          <Grid item xs={1}></Grid>
+        </Grid>
+      </Box>
+    </div>
   );
 };
 
