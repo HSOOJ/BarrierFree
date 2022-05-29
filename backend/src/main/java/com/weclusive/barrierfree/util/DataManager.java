@@ -413,16 +413,14 @@ public class DataManager {
 		}
 		return 1;
 	}
-
-	public void updateImage(String tourapi_contenttypeid) {
-		 List<Tourapi> list = tourapiRepository.findByTourapiImageIsNullAndTourapiContenttypeid(tourapi_contenttypeid);
-		 
-//		 for (Tourapi tour : list) {
-//			tour.setTourapiImage("https://ifh.cc/g/3PePgp.jpg");
-//			tourapiRepository.save(tour);
-//		}
-		 
-		 System.out.println(list.size());
+	
+	public void updateImage() {
+		List<Tourapi> tours = tourapiRepository.findByTourapiImage();
 		
+		for (Tourapi tour : tours) {
+			System.out.println(tour.getTourapiImage());
+			tour.setTourapiImage("https://ifh.cc/g/3PePgp.jpg");
+			tourapiRepository.save(tour);
+		}
 	}
 }

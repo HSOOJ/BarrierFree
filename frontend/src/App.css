@@ -1,5 +1,6 @@
 .App {
   text-align: center;
+  font-family: 'KoddiUDOnGothic-Regular';
 }
 
 .App-logo {
@@ -20,7 +21,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
+  font-size: calc(13px + 2vmin);
   color: white;
 }
 
@@ -34,5 +35,20 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@font-face {
+  font-family: 'KoddiUDOnGothic-Regular';
+  src: url('./fonts/KoddiUDOnGothic-Regular.ttf');
+}
+
+@media screen and (max-width: 400px) {
+  #about,
+  #services,
+  #contact,
+  #team,
+  #footer {
+    width: 111%;
   }
 }

@@ -1,12 +1,12 @@
-import styled, { css } from "styled-components";
-import palette from "../../lib/styles/palette";
-import { Link } from "react-router-dom";
+import styled, { css } from 'styled-components';
+import palette from '../../lib/styles/palette';
+import { Link } from 'react-router-dom';
 
 const buttonStyle = css`
   border: none;
+  font-family: 'KoddiUDOnGothic-Regular';
   border-radius: 4px;
   font-size: 1rem;
-  font-weight: bold;
   padding: 0.25rem 1rem;
   // outline: none;
   cursor: pointer;
@@ -66,6 +66,12 @@ const buttonStyle = css`
       // flex-direction: column;
       // justify-content: space-between;
       // align-items: center;
+    `}
+
+    ${(props) =>
+    props.impact &&
+    css`
+      background: ${palette.pink[0]};
     `}
 `;
 const StyledButton = styled.button`

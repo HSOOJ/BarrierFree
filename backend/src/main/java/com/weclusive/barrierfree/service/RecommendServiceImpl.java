@@ -5,9 +5,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -18,13 +16,14 @@ import org.json.simple.parser.JSONParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import com.weclusive.barrierfree.entity.Post;
 import com.weclusive.barrierfree.entity.Sido;
 import com.weclusive.barrierfree.entity.Sigungu;
 import com.weclusive.barrierfree.entity.Tourapi;
 import com.weclusive.barrierfree.entity.TourapiImpairment;
+import com.weclusive.barrierfree.repository.PostImpairmentRepository;
 import com.weclusive.barrierfree.repository.PostRepository;
 import com.weclusive.barrierfree.repository.ScrapRepository;
 import com.weclusive.barrierfree.repository.SidoRepository;
@@ -32,7 +31,6 @@ import com.weclusive.barrierfree.repository.SigunguRepository;
 import com.weclusive.barrierfree.repository.TourapiImageRepository;
 import com.weclusive.barrierfree.repository.TourapiImpairmentRepository;
 import com.weclusive.barrierfree.repository.TourapiRepository;
-import com.weclusive.barrierfree.util.ImpairmentUtils;
 
 @Service
 public class RecommendServiceImpl implements RecommendService {
@@ -42,6 +40,9 @@ public class RecommendServiceImpl implements RecommendService {
 
 	@Autowired
 	private PostRepository postRepository;
+	
+	@Autowired
+	private PostImpairmentRepository postImpairmentRepository;
 
 	@Autowired
 	private TourapiRepository tRepository;
@@ -77,13 +78,24 @@ public class RecommendServiceImpl implements RecommendService {
 			result.put("addr2", info.getTourapiAddr2());
 			result.put("homepage", info.getTourapiHomepage());
 			result.put("zipcode", info.getTourapiZipcode());
-			result.put("scraptimes", scrapRepository.countByDelYnAndScrapTypeAndScrapData('n', '1', contentId));
+			result.put("scraptimes", info.getTourapiScrap());
 			char scrap_yn = 'n';
 			if (scrapRepository.countByDelYnAndScrapTypeAndUserSeqAndScrapData('n', '1', userSeq, contentId) > 0)
 				scrap_yn = 'y';
 			result.put("scrap_yn", scrap_yn);
-			result.put("posts",
-					postRepository.findTop20ByDelYnAndContentIdOrderByPostScrapDesc('n', Long.toString(contentId)));
+			
+			List<Post> postlist = postRepository.findTop4ByDelYnAndContentIdOrderByPostScrapDesc('n', contentId);
+			List<Map<String,Object>> list = new ArrayList<>();
+			for(Post p : postlist) {
+				Map<String, Object> map = new HashMap<>();
+				map.put("postPhoto", p.getPostPhoto());
+				map.put("postTitle", p.getPostTitle());
+				map.put("impairment", postImpairmentRepository.findImpairment(p.getPostSeq()));
+				map.put("postSeq", p.getPostSeq());
+				map.put("postLoaction", p.getPostLocation());
+				list.add(map);
+			}
+			result.put("posts", list);
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new Exception();
@@ -153,7 +165,7 @@ public class RecommendServiceImpl implements RecommendService {
 	}
 
 	@Override
-	public List<Map<String, Object>> search(int userSeq, String sidoCode, String sigunguCode, String contentTypeId,
+	public List<Map<String, Object>> search(int userSeq, String sidoCode, String sigunguCode, String[] contentTypeId,
 			List<String> impairments, int page, int size) throws Exception {
 		List<Map<String, Object>> result = new LinkedList<>();
 		PageRequest pageRequest = PageRequest.of(page, size);
@@ -176,12 +188,12 @@ public class RecommendServiceImpl implements RecommendService {
 					if(impairments==null) {
 						//컨텐츠타입id만 입력한 검색결과
 						System.out.println("컨텐츠타입id만 입력한 검색결과");
-						pageTours = tRepository.findByDelYnAndTourapiContenttypeid('n', contentTypeId, pageRequest);
+						pageTours = tRepository.findByDelYnAndTourapiContenttypeidIn('n', contentTypeId, pageRequest);
 					}
 					else {
 						//컨텐츠타입id와 무장애정보를 입력한 검색결과
 						System.out.println("컨텐츠타입id와 무장애정보를 입력한 검색결과");
-						pageTours = tRepository.findByTourapiContenttypeidAndImpariments('n', contentTypeId, impairments, pageRequest);
+						pageTours = tRepository.findByTourapiContenttypeidInAndImpariments('n', contentTypeId, impairments, pageRequest);
 					}
 				}
 			}
@@ -203,7 +215,7 @@ public class RecommendServiceImpl implements RecommendService {
 						if(impairments == null) {
 							//시도와 컨텐츠타입id를 입력한 검색결과
 							System.out.println("시도와 컨텐츠타입id를 입력한 검색결과");
-							pageTours = tRepository.findByDelYnAndSidoCodeAndTourapiContenttypeid('n', sidoCode, contentTypeId, pageRequest);
+							pageTours = tRepository.findByDelYnAndSidoCodeAndTourapiContenttypeidIn('n', sidoCode, contentTypeId, pageRequest);
 						}
 						else {
 							//시도,컨텐츠타입id,무장애정보를 입력한 검색결과
@@ -229,7 +241,7 @@ public class RecommendServiceImpl implements RecommendService {
 						if(impairments == null) {
 							//시도,시군구,컨텐츠타입id를 입력한 검색결과
 							System.out.println("시도,시군구,컨텐츠타입id를 입력한 검색결과");
-							pageTours =  tRepository.findByDelYnAndSidoCodeAndSigunguCodeAndTourapiContenttypeid('n', sidoCode, sigunguCode, contentTypeId, pageRequest);
+							pageTours =  tRepository.findByDelYnAndSidoCodeAndSigunguCodeAndTourapiContenttypeidIn('n', sidoCode, sigunguCode, contentTypeId, pageRequest);
 						}
 						else {
 							//시도,시군구,컨텐츠타입id,무장애정보를 입력한 검색결과
@@ -240,21 +252,26 @@ public class RecommendServiceImpl implements RecommendService {
 				}
 			}
 			
-			System.out.println(pageTours);
+//			System.out.println(pageTours);
 			for(Tourapi t : pageTours) {
 				Map<String, Object> obj = new HashMap<>();
 				obj.put("title", t.getTourapiTitle());
 				obj.put("addr1", t.getTourapiAddr1());
 				obj.put("contentid", t.getContentId());
+				obj.put("contenttypeid", t.getTourapiContenttypeid());
 				obj.put("firstimage", t.getTourapiImage());
 				char scrap_yn = 'n';
 				// 현재 사용자의 seq를 가져오는 api 필요
 				if (scrapRepository.countByDelYnAndScrapTypeAndUserSeqAndScrapData('n', '1', userSeq, t.getContentId()) > 0)
 					scrap_yn = 'y';
 				obj.put("scrap_yn", scrap_yn);
+				obj.put("pageable", pageTours.getPageable());
+				obj.put("totalPages", pageTours.getTotalPages());
+				obj.put("numberOfElements", pageTours.getNumberOfElements());
+				obj.put("totalElements", pageTours.getTotalElements());
+				
 				result.add(obj);
 			}
-			
 		} catch (Exception e) {
 			e.printStackTrace();
 			throw new Exception();
@@ -306,7 +323,11 @@ public class RecommendServiceImpl implements RecommendService {
 				JSONObject temp = (JSONObject) o;
 				obj.put("contentid", temp.get("contentid"));
 				obj.put("title", temp.get("title"));
-				obj.put("firstimage", temp.get("firstimage"));
+				if (temp.get("firstimage") == null) {
+					obj.put("firstimage", tRepository.findByDelYnAndContentId('n', Long.parseLong(temp.get("contentid").toString())).getTourapiImage());
+				}else {
+					obj.put("firstimage", temp.get("firstimage"));
+				}
 				obj.put("addr1", temp.get("addr1"));
 
 				char scrap_yn = 'n';

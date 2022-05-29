@@ -1,58 +1,136 @@
-import React, { useEffect } from 'react';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
-import { useParams } from "react-router";
+import React, { useState } from 'react';
 import './CommentItemTest.css';
-import { commentDelete, commentUpdate } from '../../_actions/comment_actions';
-import { useDispatch, useSelector } from "react-redux";
+import { commentUpdate, commentDelete } from '../../_actions/comment_actions';
+import { useDispatch, useSelector } from 'react-redux';
+import styled from 'styled-components';
+import { useNavigate } from 'react-router-dom';
 
+const CommentItemBox = styled.div`
+  display: flex;
+  flex-dirextion: row;
+  align-items: center;
+  justify-content: flex-start;
 
-const CommentItem = ({comment}) => {
+  .toggle {
+    text-align: center;
+    margin: auto;
+    width: 50px;
+    height: 50px;
+    border-radius: 100px;
+    box-sizing: border-box;
+    &:hover {
+      color: white;
+      cursor: pointer;
+    }
+  }
+`;
 
-  console.log(comment)
-  const CommentTime = comment.comment.regDt.substring(0, 10)
-  const commentNum = comment.comment.cmtSeq
-
+const CommentItem = ({ comment, onRemove, getCommentList }) => {
+  const CommentTime = comment.comment.regDt.substring(0, 10);
+  const commentNum = comment.comment.cmtSeq;
+  const [newComment, setNewComment] = useState(comment.comment.cmtContent);
+  const [check, setCheck] = useState(false);
   const dispatch = useDispatch();
-  const myuser = useSelector((state) => state.user.userData)
-  console.log(myuser)
+  const myuser = useSelector((state) => state.user.userData);
+  const navigate = useNavigate();
 
+  const onCommentHandler = (event) => {
+    setNewComment(event.target.value);
+  };
   const onDeleteHandler = (event) => {
     event.preventDefault();
+    let params = {
+      cmtSeq: commentNum,
+      userSeq: myuser.userSeq,
+    };
+    onRemove(commentNum);
+    dispatch(commentDelete(params));
+    alert('댓글 삭제가 완료되었습니다. 😉');
+    getCommentList();
+  };
+
+  const onUpdateHandler = (event) => {
+    event.preventDefault();
+    if (newComment) {
       let params = {
-        "cmtSeq": commentNum,
-        "userSeq": myuser.userSeq
-      }
-      dispatch(commentDelete(params))
+        cmtSeq: commentNum,
+        cmtContent: newComment,
+        userSeq: myuser.userSeq,
+      };
+      dispatch(commentUpdate(params));
+      alert('댓글 수정이 완료되었습니다. 😉');
+      setCheck(false);
+    } else {
+      alert('댓글을 입력해주세요 😉');
     }
-  
-    // const onUpdateHandler = (event) => {
-    //   event.preventDefault();
-    //     let body = {
-    //       "cmtContent": commentContent,
-    //       "cmtSeq": commentNum,
-    //       "userSeq": myuser.userSeq,
-    //     }
-    
-    //     axios.put()
-    //   }
-  return(
+    getCommentList();
+  };
+
+  const checkHandler = () => {
+    if (check == true) setCheck(false);
+    else setCheck(true);
+  };
+
+  return (
     <div class="container">
       <div class="user-img">
-        <img src='https://dummyimage.com/50x50/ced4da/6c757d.jpg'></img>
+        <CommentItemBox>
+          <img
+            className="toggle"
+            src={comment.userInfo[1]}
+            onClick={() => {
+              navigate(`/user/${comment.comment.userSeq}`);
+            }}
+          ></img>
+        </CommentItemBox>
       </div>
       <div class="comment-info">
         <div>
-          <p class="comment-userid">{comment.comment.regId}</p>
-          <p class="comment-content">{comment.comment.cmtContent}</p>
+          <p class="comment-userid">{comment.userInfo[0]}</p>
+          {check == true ? (
+            <div class="modifyt-box">
+              <form onSubmit={onUpdateHandler}>
+                <input
+                  class="comment-input"
+                  placeholder="댓글을 입력하세요"
+                  onChange={onCommentHandler}
+                  value={newComment}
+                ></input>
+                <button
+                  class="update-button"
+                  onClick={onUpdateHandler}
+                  variant="contained"
+                  type="submit"
+                >
+                  수정
+                </button>
+                <button class="delete-button" onClick={checkHandler}>
+                  취소
+                </button>
+              </form>
+            </div>
+          ) : (
+            <p class="comment-content">{comment.comment.cmtContent}</p>
+          )}
         </div>
-        {/* <p onClick={onUpdateHandler}>수정하기</p> */}
       </div>
       <div class="comment-time">
-        <p>{CommentTime}</p> 
-        {comment.comment.userSeq == myuser.userSeq ? <p onClick={onDeleteHandler}>[삭제]</p> : <p></p>}
+        <p>{CommentTime}</p>
+        {comment.comment.userSeq == myuser.userSeq && check == false ? (
+          <p>
+            <button class="update-button" onClick={checkHandler}>
+              수정
+            </button>
+            <button class="delete-button" onClick={onDeleteHandler}>
+              삭제
+            </button>
+          </p>
+        ) : (
+          <p></p>
+        )}
       </div>
     </div>
-  )
-}
+  );
+};
 
 export default CommentItem;
